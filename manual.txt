@@ -1,15 +1,20 @@
 Ambient noise signal process.
 1. pre-prcs.bash 
    pre-processing
-2. runNorm.bash norm.f90
-   time domain normalization
-3. formatcvt.bash
-   covert sac file format for GSAC by formatcvt.bash
-4. whiten.bash
-   whitening with GSAC by whiten.bash
-5. crscrltn.bash
-   cross-correlation by crscrltn.bash
-6. runcacuns.bash cacuns.f90
-   Calculating SNR, remove low SNR files
-7. stk.bash stksac.f90
-   stacking high SNR file by stk.bash
+wcs.bash
+	2. runNorm.bash norm.f90
+	   time domain normalization
+	3. formatcvt.bash
+	   covert sac file format for GSAC by formatcvt.bash
+	4. whiten.bash
+	   whitening with GSAC by whiten.bash
+	5. crscrltn.bash
+	   cross-correlation by crscrltn.bash
+	6. runcacuns.bash cacuns.f90
+	   Calculating SNR, remove low SNR files
+	7. stk.bash stksac.f90
+	   stacking high SNR file by stk.bash
+8. cutsac.bash
+   cut stacked waveform.
+9. runftan.bash
+   calculate group velocity.
