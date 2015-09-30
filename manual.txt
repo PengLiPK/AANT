@@ -18,3 +18,7 @@ wcs.bash
    cut stacked waveform.
 9. runftan.bash
    calculate group velocity.
+10. findgvel.bash
+	find velocities of objects periods
+11.	prcsgvel.bash
+	format group velocity files for tomography
