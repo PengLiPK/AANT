@@ -14,6 +14,8 @@ wcs.bash
 	   Calculating SNR, remove low SNR files
 	7. stk.bash stksac.f90
 	   stacking high SNR file by stk.bash
+
+Group velocity calculation.
 8. cutsac.bash
    cut stacked waveform.
 9. runftan.bash
@@ -22,3 +24,5 @@ wcs.bash
 	find velocities of objects periods
 11.	prcsgvel.bash
 	format group velocity files for tomography
+
+Adaptive grid generation and tomography
