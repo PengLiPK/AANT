@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Adaptive grid ambient noise tomography (AANT) by PengLiPK</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-light.css">
+    <script src="javascripts/scale.fix.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1 class="header">Adaptive grid ambient noise tomography (AANT)</h1>
+        <p class="header">A software for ambient noise tomography with adaptive grid</p>
+
+        <ul>
+          <li class="download"><a class="buttons" href="https://github.com/PengLiPK/AANT/zipball/master">Download ZIP</a></li>
+          <li class="download"><a class="buttons" href="https://github.com/PengLiPK/AANT/tarball/master">Download TAR</a></li>
+          <li><a class="buttons github" href="https://github.com/PengLiPK/AANT">View On GitHub</a></li>
+        </ul>
+
+        <p class="header">This project is maintained by <a class="header name" href="https://github.com/PengLiPK">PengLiPK</a></p>
+
+
+      </header>
+      <section>
+        <h2>
+<a id="adaptive-grid-ambient-noise-tomography" class="anchor" href="#adaptive-grid-ambient-noise-tomography" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Adaptive grid ambient noise tomography.</h2>
+
+<p>This software builds the surface wave velocity model of the earth from ambient seismic noise. Ambient seismic noise is a kind of continuous background noise in seismograms, whose sources are most likely from the ocean. It is found that the cross-correlation of
+the ambient seismic noise record of two seismic stations could estimate the empirical Green’s function between the two stations. So the ambient noise can be used to build the surface wave velocity model. This software uses an automatically constructed adaptive grid which fits the spatial data distribution to represent the model structure. The method significantly improves the stability of the inverse process and the resolution of the surface wave velocity model.</p>
+
+<p>It contains the following features:<br>
+1. Time series seismic data processing and cross-correlation.<br>
+2. Automatically constructed Delaunay triangles based adaptive grid.<br>
+3. Fitted the group velocity of surface wave by using Frequency-time analysis.<br>
+4. Outputs are group velocity models at multiple periods of surface wave.</p>
+
+<h4>
+<a id="an-example-of-ambient-noise-signal" class="anchor" href="#an-example-of-ambient-noise-signal" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>An example of ambient noise signal</h4>
+
+<p><img src="./images/ambient_noise.png" alt="ambient noise">   </p>
+
+<h4>
+<a id="delaunay-triangles-based-adaptive-grid" class="anchor" href="#delaunay-triangles-based-adaptive-grid" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Delaunay triangles based adaptive grid</h4>
+
+<p><img src="./images/ambient_noise.png" alt="ambient noise"></p>
+
+<h2>
+<a id="reference" class="anchor" href="#reference" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Reference:</h2>
+
+<p><a href="http://gji.oxfordjournals.org/content/197/2/1236">Li, P. &amp; Lin, G. (2014). Adaptive ambient noise tomography and its application to the Garlock Fault, southern California. Geophys. J. Int. doi: 10.1093/gji/ggu073.</a></p>
+      </section>
+      <footer>
+        <p><small>Hosted on <a href="https://pages.github.com">GitHub Pages</a> using the Dinky theme</small></p>
+      </footer>
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+		          <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-73791386-1");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+  </body>
+</html>
