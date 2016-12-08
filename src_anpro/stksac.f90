@@ -12,12 +12,12 @@ real*4 :: sacdtsum
 integer :: Nhead
 character*4 Khead
 character*8 KEVNM
-character*70 sacfile(maxfile)
-character*70 ipf
+character*200 sacfile(maxfile)
+character*200 ipf,outf
 integer :: i,j,cvtpara,filepara,n,status1,filenum
 
 write(*,*)"inputfile1,inputfile2,integer k1,k2(k<1,convert):"
-read(*,*)ipf,cvtpara
+read(*,*)ipf,outf,cvtpara
 
 !#########################################################
 !Input sacfiles' names which need to be stacked
@@ -55,7 +55,7 @@ end if
 
 
 
-open(unit=22+filenum,file='sum.sac',form='unformatted',&
+open(unit=22+filenum,file=outf,form='unformatted',&
     access='direct',recl=4)
 
 !#############################################################

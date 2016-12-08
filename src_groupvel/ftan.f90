@@ -62,9 +62,9 @@ open(unit=25,file=outgroup)
 ! Parameters: group velocity, time, periods, frequency
 !---------------------------------------------
 
-Maxivt=nint(((6.5-2.0)/DVel)+1)
+Maxivt=nint(((5.0-1.5)/DVel)+1)
 do ivt=1,Maxivt
-    Vel(ivt)=2.0+(ivt-1)*DVel
+    Vel(ivt)=1.5+(ivt-1)*DVel
     t(ivt)=Dist/Vel(ivt)-BeginT
 !    write(*,*)Vel(ivt)
 end do

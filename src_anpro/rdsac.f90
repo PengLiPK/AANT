@@ -10,10 +10,7 @@ character*8 KEVNM
 character*70 sacfile
 integer :: i,j,k,n,status1
 
-open(21,file='rdsac.inp',status='old')
-read(*,*)sacfile
-read(*,*)n
-read(*,*)k
+read(*,*)sacfile,n,k
 
 
 if ( k < 1 ) then
