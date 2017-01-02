@@ -14,7 +14,7 @@ type(srstrct) :: source(maxsource)
 type(rcstrct) :: receiver(maxreceiver)
 type(tstrct) :: v(maxgrid)
 type(pstrct),pointer :: ptri(:)
-type(gnstrct),target :: gn(maxvel),gntemp
+type(gnstrct),target :: gn(maxvel)
 type(pgnstrct),pointer :: pgn(:),pgntemp
 type(srstrct) :: vtx(maxsource)
 real(kind=8) :: g(maxdata,maxvel)
@@ -32,7 +32,7 @@ real(kind=8) :: thrshd0,thrshd1,thrshd2
 real(kind=8) :: fqthr,period
 integer :: tri(maxtri,3)
 integer :: trinum
-integer :: nvtx,rst
+integer :: nvtx
 integer :: hwnodenum(maxvel)
 integer :: hwnum,hwmax,newndnum
 integer :: edgenode
@@ -46,7 +46,6 @@ integer :: icoord
 integer :: iv
 integer :: id,im
 integer :: idmax,immax
-integer :: errormem
 integer :: date(3)
 integer :: time(3)
 character(len=70) :: sourcefile
@@ -157,7 +156,6 @@ do is=1,ns
             write(*,*)"Number ",ir," receiver is outside study area!!"
             stop
         end if
-        write(*,*)receiver(ir)%x,receiver(ir)%y
     end do
     close(30)
 
@@ -258,7 +256,7 @@ node_p=>node_head%next
 do im=1,immax
     if(gnmax .eq. 0)then
         write(*,*)"All entries of matrix are 0!! &
-        Stop on line 169 of fmmrf2od_v7.f90"
+        &Stop on line 169 of fmmrf2od_v7.f90"
         stop
     else if(gn(im)%val .lt. thrshd1)then
         write(*,*)"line170m,node,gn",im,gn(im)
@@ -378,7 +376,6 @@ type(tstrct), target :: travelt(maxgrid)
 type(tstrct), target :: rtravelt(maxgrid)
 type(pstrct), pointer :: ptravelt(:)
 type(pstrct), pointer :: prtravelt(:)
-type(nb_linklist), pointer :: nb_travelt,nb_head,nb_temp
 type(pstrct), pointer :: ptemp
 type(srstrct) :: vtx(maxsource)
 real(kind=8) :: v(maxgrid)
@@ -390,14 +387,12 @@ real(kind=8) :: dxx(maxpathnode)
 real(kind=8) :: dyy
 real(kind=8) :: rdxx(maxpathnode)
 real(kind=8) :: rdyy
-real(kind=8) :: vsr,rvsr
 real(kind=8) :: dx,dy
 real(kind=8) :: rdx,rdy
 real(kind=8) :: minx,maxx
 real(kind=8) :: miny,maxy
 real(kind=8) :: rminx,rmaxx
 real(kind=8) :: rminy,rmaxy
-real(kind=8) :: tempt
 real(kind=8) :: rfxrg,rfyrg
 real(kind=8) :: rfrg(4)
 real(kind=8) :: rfxint,rfyint
@@ -405,15 +400,14 @@ real(kind=8) :: tempara1,tempara2
 real(kind=8) :: dxv,dyv
 real(kind=8) :: temptt
 integer :: nvtx,rst
-integer :: nbnode(maxnbnode)
+integer :: nb(maxnbnode),nbnode(maxnbnode),nbtail
+integer :: tempnbnode(maxnbnode),tempnbnum
 integer :: nbnum,inb
 integer :: gridtype
 integer :: tri(maxtri,3)
 integer :: trinum
 integer :: vxnum,vynum
 integer :: vnum
-integer :: sqnum(2,2)
-integer :: samet(maxgrid)
 integer :: imethod
 integer :: icoodnt
 integer :: ist,iist
@@ -426,18 +420,15 @@ integer :: rxnum,rynum
 integer :: ttlgnum,rttlgnum
 integer :: rcnum
 integer :: gnum,rgnum
-integer :: tmplnumx,tmplnumy
 integer :: ig
 integer :: iv
 integer :: ip,iip,rip
 integer :: ix,iy
-integer :: itempt
 integer :: isr
-integer :: nr,ir,iprv
+integer :: nr,ir
 integer :: ipth,ippth
 integer :: iipnum
 integer :: i,j,k
-integer :: errormem
 character(len=10) :: sourcenum
 character(len=70) :: tfilename
 character(len=70) :: pathfname
@@ -448,10 +439,12 @@ vorig=vinp
 write(*,*)"vnum",vnum
 ! initial grid are all far away
 travelt%stat=-1
+travelt%nbstat=0
 rtravelt%stat=-1
+travelt%nbstat=0
 
-allocate(ptravelt(1:250000))
-allocate(prtravelt(1:250000))
+allocate(ptravelt(1:maxgrid))
+allocate(prtravelt(1:maxgrid))
 allocate(prv(1:4))
 allocate(ptri(1:3))
 
@@ -770,14 +763,8 @@ rfrg(4)=rcenter%y-rfxrg+rdy/10.0
 i=1
 j=1
 k=1
-allocate(nb_head,stat=errormem)
-if(errormem/=0)then
-    write(*,*)"Out of memory!! (fmmrf2od_v7)"
-    stop
-end if
-nullify(nb_head%prev)
-nullify(nb_head%next)
-nb_travelt=>nb_head
+nb=0
+nbtail=0
 do while( (prtravelt(rip)%p%x .lt. rfrg(1)) .and.& 
 &         (prtravelt(rip)%p%x .gt. rfrg(2)) .and.&
 &         (prtravelt(rip)%p%y .lt. rfrg(3)) .and.&
@@ -786,6 +773,7 @@ do while( (prtravelt(rip)%p%x .lt. rfrg(1)) .and.&
     i=i+1
     ! Update narrow band grid.
     !----------------------------------------------------------------------
+    tempnbnum=0
     do iip=rip-ist,rip
         iipnum=prtravelt(iip)%p%num
         if(imethod .eq. 1)then
@@ -797,114 +785,93 @@ do while( (prtravelt(rip)%p%x .lt. rfrg(1)) .and.&
             write(*,*)"Methods parameter is neither 1 or 2!!"
         end if
         
-        ! Add narrow band nodes to linklist nb
-        do inb=1,nbnum
-            allocate(nb_travelt%next,stat=errormem)
-            if(errormem/=0)then
-                write(*,*)"Out of memory!! (fmmrf2od_v7)"
-                stop
-            end if
-            nb_travelt%next%prev=>nb_travelt
-            nullify(nb_travelt%next%next)
-            nb_travelt=>nb_travelt%next
-            nb_travelt%p=>rtravelt(nbnode(inb))
-        end do
+        ! Add narrow band nodes to tempnbnode
+        tempnbnode(tempnbnum+1:tempnbnum+nbnum)=nbnode(1:nbnum)
+        tempnbnum=tempnbnum+nbnum
 
     end do
     
     !----------------------------------------------------------------------
 
-    ! Find alive grid, searching linklist nb from nb_head, delete living 
-    ! nodes from linklist nb
-    !----------------------------------------------------------------------
-    itempt=0
-    ist=0
-    samet=0
-    nb_temp=>nb_head%next
-    do while(associated(nb_temp))
-        if((nb_temp%p%stat .eq. 0) .or. (nb_temp%p%stat .eq. 2))then
-            nb_temp%p%stat=0
-            itempt=itempt+1
-            if(itempt .eq. 1)then
-              tempt=2*nb_temp%p%t
-            end if
-            if(nb_temp%p%t .lt. tempt)then
-              prtravelt(rip+1)%p=>nb_temp%p
-              tempt=prtravelt(rip+1)%p%t
-              samet=0
-              ist=0
-            ! Find the nodes whose t equal to smallest t in narrow band
-            else if((nb_temp%p%t .eq. tempt) .and. &
-            & (nb_temp%p%num .ne. prtravelt(rip+1)%p%num))then
-                if(ist .eq. 0)then
-                    ist=ist+1
-                    samet(ist)=nb_temp%p%num
-                else
-                    do iist=1,ist
-                        if(nb_temp%p%num .ne. &
-                        & samet(iist))then
-                            ist=ist+1
-                            samet(ist)=nb_temp%p%num
-                        end if
-                    end do
-                end if
-            end if
-            nb_temp=>nb_temp%next
-        else if(nb_temp%p%stat .eq. 1)then
-            call nb_del(nb_temp)
+    do inb=1,tempnbnum
+    if(rtravelt(tempnbnode(inb))%nbstat .eq. 0)then
+        nbtail=nbtail+1
+        nb(nbtail)=tempnbnode(inb)
+        rtravelt(nb(nbtail))%nbstat=nbtail
+        rtravelt(nb(nbtail))%stat=0
+        call upheap2d(rtravelt,nb,nbtail)
+    else if(rtravelt(tempnbnode(inb))%nbstat .gt. 0)then
+        rtravelt(tempnbnode(inb))%stat=0
+        call updateheap2d(rtravelt,nb,rtravelt(tempnbnode(inb))%nbstat,nbtail)
         end if
     end do
+
+    ! Find alive grid, delete the root of heap and its children with same
+    ! values as the root.
+    !----------------------------------------------------------------------
+    ist=0
+    prtravelt(rip+1)%p=>rtravelt(nb(1))
     prtravelt(rip+1)%p%stat=1
+    prtravelt(rip+1)%p%nbstat=0
+    nb(1)=nb(nbtail)
+    rtravelt(nb(1))%nbstat=1
+    nbtail=nbtail-1
+    call downheap2d(rtravelt,nb,1,nbtail)
     
 
     ! Insert refined grid value into outter grid.
     tempara1=prtravelt(rip+1)%p%x-dx*&
-    &   aint((prtravelt(rip+1)%p%x+(0.01*rdx))/dx)
+    &   anint(prtravelt(rip+1)%p%x/dx)
     tempara2=prtravelt(rip+1)%p%y-dy*&
-    &   aint((prtravelt(rip+1)%p%y+(0.01*rdy))/dy)
-    if((abs(tempara2) .lt. 0.000001) &
-    & .and. (abs(tempara1) .lt. 0.000001))then
+    &   anint(prtravelt(rip+1)%p%y/dy)
+    if((abs(tempara1) .lt. 1d-3*rdx) .and.& 
+    &  (abs(tempara2) .lt. 1d-3*rdy))then
        gnum=nint((prtravelt(rip+1)%p%x-minx)/dx)+1+&
-       &      nint((prtravelt(rip+1)%p%y-miny)/dy)*xnum
+       &    nint((prtravelt(rip+1)%p%y-miny)/dy)*xnum
        travelt(gnum)%t=prtravelt(rip+1)%p%t
        travelt(gnum)%stat=1
        ip=ip+1
        ptravelt(ip)%p=>travelt(gnum)
     end if
 
-    if(ist .ne. 0)then
-       do iist=1,ist
-          rip=rip+1
-          prtravelt(rip+1)%p=>rtravelt(samet(iist))
-          prtravelt(rip+1)%p%stat=1
-          tempara1=prtravelt(rip+1)%p%x-dx*&
-           &   aint((prtravelt(rip+1)%p%x+(0.01*rdx))/dx)
-          tempara2=prtravelt(rip+1)%p%y-dy*&
-           &   aint((prtravelt(rip+1)%p%y+(0.01*rdy))/dy)
-          if((abs(tempara2) .lt. 0.000001) &
-          & .and. (abs(tempara1) .lt. 0.000001))then
-             gnum=nint((prtravelt(rip+1)%p%x-minx)/dx)+1+&
-             &      nint((prtravelt(rip+1)%p%y-miny)/dy)*xnum
-             travelt(gnum)%t=prtravelt(rip+1)%p%t
-             travelt(gnum)%stat=1
-             ip=ip+1
-             ptravelt(ip)%p=>travelt(gnum)
-         end if
-       end do
+    rip=rip+1
+
+    do while(rtravelt(nb(1))%t .eq. prtravelt(rip)%p%t)
+        ist=ist+1
+        prtravelt(rip+1)%p=>rtravelt(nb(1))
+        prtravelt(rip+1)%p%stat=1
+        prtravelt(rip+1)%p%nbstat=0
+        nb(1)=nb(nbtail)
+        rtravelt(nb(1))%nbstat=1
+        nbtail=nbtail-1
+        call downheap2d(rtravelt,nb,1,nbtail)
+        rip=rip+1
+    end do
+
+
+    if(ist .gt. 0)then
+        do iist=1,ist
+            iip=rip-iist+1
+            prtravelt(iip)%p%stat=1
+            tempara1=prtravelt(iip)%p%x-dx*&
+            &   anint(prtravelt(iip)%p%x/dx)
+            tempara2=prtravelt(iip)%p%y-dy*&
+            &   anint(prtravelt(iip)%p%y/dy)
+            if((abs(tempara1) .lt. 1d-3*rdx) .and.& 
+            &  (abs(tempara2) .lt. 1d-3*rdy))then
+                gnum=nint((prtravelt(iip)%p%x-minx)/dx)+1+&
+                &    nint((prtravelt(iip)%p%y-miny)/dy)*xnum
+                travelt(gnum)%t=prtravelt(iip)%p%t
+                travelt(gnum)%stat=1
+                ip=ip+1
+                ptravelt(ip)%p=>travelt(gnum)
+            end if
+        end do
     end if
+
     !----------------------------------------------------------------
 
-    rip=rip+1
 end do
-
-! Deallocate linklist nb in memory
-nb_temp=>nb_head
-do while(associated(nb_temp))
-    call nb_del(nb_temp)
-end do
-
-! i is loop times of caculation, j is the times of call "march" subroutine
-write(*,*)"Line578,loop times i,subroutine march used times j",i,j
 
 
 ! "refine.out" records the information of refined grids which are caculated
@@ -922,9 +889,10 @@ write(*,*)"Refine part ends!"
 
 
 
-! Caculate non-refined ereas. Line553
+!####Caculate non-refined ereas.
 !------------------------------------------------------------------------
 
+! Velocity of each node
 ist=ip-1
 open(232,file='vfile.txt',status='replace')
 write(232,*)ttlgnum
@@ -954,21 +922,16 @@ close(232)
 i=1
 j=1
 k=1
-open(233,file='temp_ptravelt.txt',status='replace')
-allocate(nb_head)
-nullify(nb_head%prev)
-nullify(nb_head%next)
-nb_travelt=>nb_head
-
-write(*,*)"line755"
+nb=0
+nbtail=0
 ! Update live, narrow band grid.
 !-------------------------------------------------------------------------
 do while(ip .lt. ttlgnum)
     i=i+1
     ! Update narrow band grid.
     !-------------------------------------------------------------------------
+    tempnbnum=0
     do iip=ip-ist,ip
-        write(233,*)ptravelt(iip)%p
         iipnum=ptravelt(iip)%p%num
         if(imethod .eq. 1)then
             call march1(iipnum,travelt,v,xnum,ttlgnum,dyy)
@@ -979,94 +942,56 @@ do while(ip .lt. ttlgnum)
             write(*,*)"Method parameter is neither 1 or 2!!!"
         end if
 
-        ! Add narrow band nodes to linklist nb
-        if(nbnum .gt. 0)then
-            do inb=1,nbnum
-                allocate(nb_travelt%next,stat=errormem)
-                if(errormem/=0)then
-                    write(*,*)"Out of memory!! (fmmrf2od_v7)"
-                    stop
-                end if
-                nb_travelt%next%prev=>nb_travelt
-                nullify(nb_travelt%next%next)
-                nb_travelt=>nb_travelt%next
-                nb_travelt%p=>travelt(nbnode(inb))
-            end do
-        end if
+        ! Add narrow band nodes to tempnbnode
+        tempnbnode(tempnbnum+1:tempnbnum+nbnum)=nbnode(1:nbnum)
+        tempnbnum=tempnbnum+nbnum
     end do
 
     !----------------------------------------------------------------------
+
+    ! Add narrow band nodes to nb
+    do inb=1,tempnbnum
+        if(travelt(tempnbnode(inb))%nbstat .eq. 0)then
+            nbtail=nbtail+1
+            nb(nbtail)=tempnbnode(inb)
+            travelt(nb(nbtail))%nbstat=nbtail
+            travelt(nb(nbtail))%stat=0
+            call upheap2d(travelt,nb,nbtail)
+        else if(travelt(tempnbnode(inb))%nbstat .gt. 0)then
+            travelt(tempnbnode(inb))%stat=0
+            call updateheap2d(travelt,nb,travelt(tempnbnode(inb))%nbstat,nbtail)
+        end if
+    end do
     
     ! Find alive grid
     !----------------------------------------------------------------------
-    itempt=0
     ist=0
-    samet=0
-    nb_temp=>nb_head%next
-    do while(associated(nb_temp))
-        if((nb_temp%p%stat .eq. 0) .or. (nb_temp%p%stat .eq. 2))then
-            nb_temp%p%stat=0
-            itempt=itempt+1
-            if(itempt .eq. 1)then
-              tempt=2*nb_temp%p%t
-            end if
-            if(nb_temp%p%t .lt. tempt)then
-              ptravelt(ip+1)%p=>nb_temp%p
-              tempt=ptravelt(ip+1)%p%t
-              samet=0
-              ist=0
-            ! Find the nodes whose t equal to smallest t in narrow band
-            else if((nb_temp%p%t .eq. tempt) .and. &
-            & (nb_temp%p%num .ne. ptravelt(ip+1)%p%num))then
-                if(ist .eq. 0)then
-                    ist=ist+1
-                    samet(ist)=nb_temp%p%num
-                else
-                    do iist=1,ist
-                        if(nb_temp%p%num .ne. &
-                        & samet(iist))then
-                            ist=ist+1
-                            samet(ist)=nb_temp%p%num
-                        end if
-                    end do
-                end if
-            end if
-            nb_temp=>nb_temp%next
-        else if(nb_temp%p%stat .eq. 1)then
-            ! If the tail of nb_linklist was deleted, rewind pointer
-            ! "nb_travelt" to previous one
-            if(.not. associated(nb_temp%next))then
-                write(*,*)"line864",nb_temp%p
-                nb_travelt=>nb_travelt%prev
-            end if
-            call nb_del(nb_temp)
-        end if
-    end do
+    ptravelt(ip+1)%p=>travelt(nb(1))
     ptravelt(ip+1)%p%stat=1
-    
-    ! Find living nodes which have same T as the smallest T
-    if(ist .ne. 0)then
-        do iist=1,ist
-           ip=ip+1
-           ptravelt(ip+1)%p=>travelt(samet(iist))
-           ptravelt(ip+1)%p%stat=1
-        end do
-    end if
-    !-----------------------------------------------------------------------
-    
-    !write(*,*)"line842",ip+1
+    ptravelt(ip+1)%p%nbstat=0
+    nb(1)=nb(nbtail)
+    travelt(nb(1))%nbstat=1
+    nbtail=nbtail-1
+    call downheap2d(travelt,nb,1,nbtail)
     ip=ip+1
+    do while((travelt(nb(1))%t .eq. ptravelt(ip)%p%t) .and. &
+            &(nbtail .ge. 1))
+        ist=ist+1
+        ptravelt(ip+1)%p=>travelt(nb(1))
+        ptravelt(ip+1)%p%stat=1
+        ptravelt(ip+1)%p%nbstat=0
+        nb(1)=nb(nbtail)
+        travelt(nb(1))%nbstat=1
+        nbtail=nbtail-1
+        call downheap2d(travelt,nb,1,nbtail)
+        ip=ip+1
+    end do
+
+
 end do
 close(233)
 !-------------------------------------------------------------------------
 
-nb_temp=>nb_head
-do while(associated(nb_temp))
-    call nb_del(nb_temp)
-end do
-
-! i is loop times of caculation, j is the times of call "march" subroutine
-write(*,*)"line672,loop times i,subroutine march used times j",i,j
 
 
 ! Find the ray path and frechet derivative
@@ -1148,7 +1073,7 @@ end do
 do ist=1,ip
     write(102,1001)ptravelt(ist)%p
     write(103,1001)travelt(ist)
-1001 format(1x,f16.12,1x,f16.12,1x,f16.12,1x,f16.12,1x,i6.6,1x,i1)
+1001 format(1x,f16.12,1x,f16.12,1x,f16.12,1x,f16.12,1x,i6.6,1x,i1,1x,i1)
 end do
 close(102)    
 close(103)
@@ -1164,5 +1089,353 @@ end subroutine cacut
 
 !------------------------------------------------------------------------
 
+
+
+! This subroutine uses 1st order upwind method to update the travel times
+! of narrow band grids.
+!-----------------------------------------------------------------------
+subroutine march1(num,travelt,v,xnum,ttlgnum,dyy)
+
+use strct
+implicit none
+type(tstrct) :: travelt(maxgrid)
+real(kind=8) :: v(maxgrid)
+real(kind=8) :: dyy
+real(kind=8) :: temptx,tempty
+real(kind=8) :: a,b,c
+integer :: num
+integer :: xnum
+integer :: ttlgnum
+integer :: gnum
+integer :: iudlr1,iudlr2
+integer :: xsol,ysol
+
+xsol=0
+ysol=0
+do iudlr1=-1,1,2
+  do iudlr2=-1,1,2
+  ! Update right, left, down and up grid
+     gnum=num+(iudlr1-1)*iudlr2/2+&
+     &    xnum*((iudlr1+1)*iudlr2/2)
+     ! Check if these grids exist.
+     if((gnum .gt. 0) .and. (gnum .le. ttlgnum))then
+        if(((real(iudlr2)*travelt(gnum)%x) .lt. &
+         &  (real(iudlr2)*travelt(num)%x)) .or. &
+         & abs(travelt(gnum)%x-travelt(num)%x) .lt.&
+         & 0.0001)then
+            
+            ! Make sure the  grid is not alive
+            if(travelt(gnum)%stat .lt. 1)then
+
+                ! Check upwind direction of x coodinate
+                if((travelt(gnum+1)%x .gt. travelt(gnum)%x) .and.&
+                & (travelt(gnum+1)%stat .eq. 1))then
+                    if((travelt(gnum-1)%x .lt. travelt(gnum)%x) .and.&
+                    & (travelt(gnum-1)%stat .eq. 1))then
+                        temptx=min(travelt(gnum-1)%t,travelt(gnum+1)%t)
+                        xsol=1
+                    else
+                        temptx=travelt(gnum+1)%t
+                        xsol=1
+                    end if
+                else if((travelt(gnum-1)%x .lt. travelt(gnum)%x)&
+                & .and. (travelt(gnum-1)%stat .eq. 1))then
+                    temptx=travelt(gnum-1)%t
+                    xsol=1
+                else
+                    temptx=0
+                    xsol=0
+                end if
+
+                ! Check upwind direction of y coodinate
+                if(((gnum-xnum) .gt. 0) .and. &
+                & (travelt(gnum-xnum)%stat .eq. 1))then
+                    if(((gnum+xnum) .le. ttlgnum) .and. &
+                    & (travelt(gnum+xnum)%stat .eq. 1))then
+                        tempty=min(travelt(gnum-xnum)%t,&
+                        &      travelt(gnum+xnum)%t)
+                        ysol=1
+                    else
+                        tempty=travelt(gnum-xnum)%t
+                        ysol=1
+                    end if
+                else if(((gnum+xnum) .le. ttlgnum) .and. &
+                &  (travelt(gnum+xnum)%stat .eq. 1))then
+                    tempty=travelt(gnum+xnum)%t
+                    ysol=1
+                else
+                    tempty=0
+                    ysol=0
+                end if
+
+                a=xsol/(travelt(gnum)%dxx**2)+ysol/(dyy**2)
+                b=-2.0*((xsol*temptx)/(travelt(gnum)%dxx**2)+&
+                & (ysol*tempty)/(dyy**2))
+                c=(xsol*((temptx/travelt(gnum)%dxx)**2))+ &
+                & (ysol*((tempty/dyy)**2))-1.0/(v(gnum)**2)
+                travelt(gnum)%t=(-b+sqrt(b**2-4.0*a*c))/(2*a)
+                travelt(gnum)%stat=2
+            end if
+        end if
+     end if
+  end do
+end do
+
+end subroutine march1
+!-----------------------------------------------------------------------
+
+
+! This subroutine uses 2nd order upwind method to update the travel times
+! of narrow band grids.
+!-----------------------------------------------------------------------
+subroutine march2(num,travelt,v,xnum,ttlgnum,dyy,nbnode,nbnum)
+
+use strct
+implicit none
+type(tstrct) :: travelt(maxgrid)
+real(kind=8) :: v(maxgrid)
+real(kind=8) :: dyy
+real(kind=8) :: temptx,tempty
+real(kind=8) :: temptx1,temptx2
+real(kind=8) :: tempty1,tempty2
+real(kind=8) :: a,b,c
+real(kind=8) :: vx,vy
+real(kind=8) :: vavr
+integer :: nbnode(maxnbnode)
+integer :: nbnum
+integer :: num
+integer :: xnum
+integer :: ttlgnum
+integer :: gnum
+integer :: iudlr1,iudlr2
+integer :: xsol,ysol
+
+nbnum=0
+xsol=0
+ysol=0
+do iudlr1=-1,1,2
+  do iudlr2=-1,1,2
+  ! Update right, left, down and up grid
+     gnum=num+(iudlr1-1)*iudlr2/2+&
+     &    xnum*((iudlr1+1)*iudlr2/2)
+     ! Check if these grids exist.
+     if((gnum .gt. 0) .and. (gnum .le. ttlgnum))then
+        if(((real(iudlr2)*travelt(gnum)%x) .lt. &
+         &  (real(iudlr2)*travelt(num)%x)) .or. &
+         & abs(travelt(gnum)%x-travelt(num)%x) .lt.&
+         & 0.0001)then
+            
+            ! Make sure the  grid is not alive
+            if(travelt(gnum)%stat .lt. 1)then
+
+                ! Check upwind direction of x coodinate
+                if((travelt(gnum+1)%x .gt. travelt(gnum)%x) .and.&
+                & (travelt(gnum+1)%stat .eq. 1))then
+                    if((travelt(gnum-1)%x .lt. travelt(gnum)%x) .and.&
+                    & (travelt(gnum-1)%stat .eq. 1))then
+                        !Check second order
+                        if((travelt(gnum+2)%x .gt. travelt(gnum+1)%x) .and.&
+                        & (travelt(gnum+2)%stat .eq. 1))then
+                            if((travelt(gnum-2)%x .lt. travelt(gnum-1)%x) .and.&
+                            & (travelt(gnum-2)%stat .eq. 1))then
+                                temptx1=(2.0*travelt(gnum-1)%t-&
+                                & 0.5*travelt(gnum-2)%t)
+                                temptx2=(2.0*travelt(gnum+1)%t-&
+                                & 0.5*travelt(gnum+2)%t)
+                                if(temptx1 .le. temptx2)then
+                                    temptx=temptx1
+                                    vx=(3.0*v(gnum)+4.0*v(gnum-1)+v(gnum-2))/8.0
+                                else
+                                    temptx=temptx2
+                                    vx=(3.0*v(gnum)+4.0*v(gnum+1)+v(gnum+2))/8.0
+                                end if
+                                xsol=2
+                            else
+                                temptx1=travelt(gnum-1)%t
+                                temptx2=travelt(gnum+1)%t
+                                if(temptx1 .le. temptx2)then
+                                    temptx=temptx1
+                                    vx=(v(gnum)+v(gnum-1))/2.0
+                                else
+                                    temptx=temptx2
+                                    vx=(v(gnum)+v(gnum-1))/2.0
+                                end if
+                                xsol=1
+                            end if
+                        else
+                            temptx1=travelt(gnum-1)%t
+                            temptx2=travelt(gnum+1)%t
+                            if(temptx1 .le. temptx2)then
+                                temptx=temptx1
+                                vx=(v(gnum)+v(gnum-1))/2.0
+                            else
+                                temptx=temptx2
+                                vx=(v(gnum)+v(gnum+1))/2.0
+                            end if
+                            xsol=1
+                        end if
+                    else if((travelt(gnum+2)%x .gt. travelt(gnum+1)%x) .and.&
+                    & (travelt(gnum+2)%stat .eq. 1))then
+                        temptx=2.0*travelt(gnum+1)%t-0.5*travelt(gnum+2)%t
+                        vx=(3.0*v(gnum)+4.0*v(gnum+1)+v(gnum+2))/8.0
+                        xsol=2
+                    else
+                        temptx=travelt(gnum+1)%t
+                        vx=(v(gnum)+v(gnum+1))/2.0
+                        xsol=1
+                    end if
+                else if((travelt(gnum-1)%x .lt. travelt(gnum)%x)&
+                & .and. (travelt(gnum-1)%stat .eq. 1))then
+                    if((travelt(gnum-2)%x .lt. travelt(gnum-1)%x) .and.&
+                    & (travelt(gnum-2)%stat .eq. 1))then
+                        temptx=2.0*travelt(gnum-1)%t-0.5*travelt(gnum-2)%t
+                        vx=(3.0*v(gnum)+4.0*v(gnum-1)+v(gnum-2))/8.0
+                        xsol=2
+                    else
+                        temptx=travelt(gnum-1)%t
+                        vx=(v(gnum)+v(gnum-1))/2.0
+                        xsol=1
+                    end if
+                else
+                    temptx=0
+                    vx=v(gnum)
+                    xsol=0
+                end if
+
+                ! Check upwind direction of y coodinate
+                if(((gnum-xnum) .gt. 0) .and. &
+                & (travelt(gnum-xnum)%stat .eq. 1))then
+                    if(((gnum+xnum) .le. ttlgnum) .and. &
+                    & (travelt(gnum+xnum)%stat .eq. 1))then
+                        ! Check 2nd order
+                        if(((gnum-2*xnum) .gt. 0) .and. &
+                        & (travelt(gnum-2*xnum)%stat .eq. 1))then
+                            if(((gnum+2*xnum) .le. ttlgnum) .and. &
+                            & (travelt(gnum+2*xnum)%stat .eq. 1))then
+                                tempty1=(2.0*travelt(gnum-xnum)%t-&
+                                & 0.5*travelt(gnum-2*xnum)%t)
+                                tempty2=(2.0*travelt(gnum+xnum)%t-&
+                                & 0.5*travelt(gnum+2*xnum)%t)
+                                if(tempty1 .le. tempty2)then
+                                    tempty=tempty1
+                                    vy=(3.0*v(gnum)+4.0*v(gnum-xnum)&
+                                    &   +v(gnum-2*xnum))/8.0
+                                else
+                                    tempty=tempty2
+                                    vy=(3.0*v(gnum)+4.0*v(gnum+xnum)&
+                                    &   +v(gnum+2*xnum))/8.0
+                                end if
+                                ysol=2
+                            else
+                                tempty1=travelt(gnum-xnum)%t
+                                tempty2=travelt(gnum+xnum)%t
+                                if(tempty1 .le. tempty2)then
+                                    tempty=tempty1
+                                    vy=(v(gnum)+v(gnum-xnum))/2.0
+                                else
+                                    tempty=tempty2
+                                    vy=(v(gnum)+v(gnum+xnum))/2.0
+                                end if
+                                ysol=1
+                            end if
+                        else
+                            tempty1=travelt(gnum-xnum)%t
+                            tempty2=travelt(gnum+xnum)%t
+                            if(tempty1 .le. tempty2)then
+                                tempty=tempty1
+                                vy=(v(gnum)+v(gnum-xnum))/2.0
+                            else
+                                tempty=tempty2
+                                vy=(v(gnum)+v(gnum+xnum))/2.0
+                            end if
+                            ysol=1
+                        end if
+                    else if(((gnum-2*xnum) .gt. 0) .and. &
+                    & (travelt(gnum-2*xnum)%stat .eq. 1))then
+                        tempty=2.0*travelt(gnum-xnum)%t-&
+                        & 0.5*travelt(gnum-2*xnum)%t
+                        vy=(3.0*v(gnum)+4.0*v(gnum-xnum)+v(gnum-2*xnum))/8.0
+                        ysol=2
+                    else
+                        tempty=travelt(gnum-xnum)%t
+                        vy=(v(gnum)+v(gnum-xnum))/2
+                        ysol=1
+                    end if
+                else if(((gnum+xnum) .le. ttlgnum) .and. &
+                &  (travelt(gnum+xnum)%stat .eq. 1))then
+                    if(((gnum+2*xnum) .le. ttlgnum) .and. &
+                    & (travelt(gnum+2*xnum)%stat .eq. 1))then
+                        tempty=2.0*travelt(gnum+xnum)%t-&
+                        & 0.5*travelt(gnum+2*xnum)%t
+                        vy=(3.0*v(gnum)+4.0*v(gnum+xnum)+v(gnum+2*xnum))/8.0
+                        ysol=2
+                    else
+                        tempty=travelt(gnum+xnum)%t
+                        vy=(v(gnum)+v(gnum+xnum))/2.0
+                        ysol=1
+                    end if
+                else
+                    tempty=0
+                    vy=v(gnum)
+                    ysol=0
+                end if
+
+                if(xsol .gt. 0)then
+                    if(ysol .gt. 0)then
+                        vavr=(vx+vy)/2.0
+                    else
+                        vavr=vx
+                    end if
+                else 
+                    if(ysol .gt. 0)then
+                        vavr=vy
+                    else
+                        write(*,*)"xsol,ysol:",xsol,ysol,"error in march2!"
+                    end if
+                end if
+
+                if(xsol .lt. 2)then
+                    if(ysol .lt. 2)then
+                        a=xsol/(travelt(gnum)%dxx**2)+ysol/(dyy**2)
+                        b=-2.0*((xsol*temptx)/(travelt(gnum)%dxx**2)+(ysol*tempty)/(dyy**2))
+                        c=xsol*((temptx/travelt(gnum)%dxx)**2)+ &
+                        & ysol*((tempty/dyy)**2)-1.0/(vavr**2)
+                    else if(ysol .eq. 2)then
+                        a=xsol/(travelt(gnum)%dxx**2)+9.0/(4.0*(dyy**2))
+                        b=-2.0*(xsol*temptx)/(travelt(gnum)%dxx**2)-3.0*tempty/(dyy**2)
+                        c=xsol*((temptx/travelt(gnum)%dxx)**2)+(tempty/dyy)**2 &
+                        & -1.0/(vavr**2)
+                    else
+                        write(*,*)"ysol:",ysol,"error in march2!"
+                    end if
+                else if(xsol .eq. 2)then 
+                    if(ysol .lt. 2)then
+                        a=ysol/(dyy**2)+9.0/(4.0*(travelt(gnum)%dxx**2))
+                        b=-2.0*(ysol*tempty)/(dyy**2)-3.0*temptx/(travelt(gnum)%dxx**2)
+                        c=ysol*((tempty/dyy)**2)+(temptx/travelt(gnum)%dxx)**2 &
+                        & -1.0/(vavr**2)
+                    else if(ysol .eq. 2)then
+                        a=9.0/(4.0*(dyy**2))+9.0/(4.0*(travelt(gnum)%dxx**2))
+                        b=-3.0*(temptx/(travelt(gnum)%dxx**2)+tempty/(dyy**2))
+                        c=(temptx/travelt(gnum)%dxx)**2+(tempty/dyy)**2 &
+                        & -1.0/(vavr**2)
+                    else
+                        write(*,*)"ysol:",ysol,"error in march2!"
+                    end if
+                else
+                    write(*,*)"ysol:",ysol,"error in march2!"
+                end if
+                travelt(gnum)%t=(-b+sqrt(b**2-4.0*a*c))/(2*a)
+                travelt(gnum)%stat=2
+                nbnum=nbnum+1
+                nbnode(nbnum)=gnum
+            end if
+        end if
+     end if
+  end do
+end do
+
+end subroutine march2
+!-----------------------------------------------------------------------
 
 

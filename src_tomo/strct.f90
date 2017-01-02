@@ -11,6 +11,9 @@
 !            poly_locat (determine a point in or out of an polygon)
 !            addnodes (add nodes in Delaunay triangles where ray 
 !                       weights are high)
+!            updateheap
+!            upheap
+!            downheap
 !------------------------------------------------------------------
 module strct
     implicit none
@@ -32,12 +35,16 @@ module strct
 
 ! stat=1,0,-1 means alive, narrowband, far away.
 ! stat=2 is temporary, to avoid duplication.
+! nbstat=0 mean the nodes are not in narrowband.        |
+! nbstat>0 mean the nodes are in narrowband, in this cas|
+! nbstat is the index of the narrowband heap
     type tstrct
         real(kind=8) :: x
         real(kind=8) :: y
         real(kind=8) :: t
         real(kind=8) :: dxx
         integer :: num
+        integer :: nbstat
         integer :: stat
     end type
        
@@ -365,15 +372,12 @@ subroutine poly_locat(x,y,nvtx,vtx,rst)
 implicit none
 type(srstrct) :: vtx(maxsource)
 real(kind=8) :: x,y
-real(kind=8), allocatable :: xp(:),yp(:)
-real(kind=8), allocatable :: a(:)
-real(kind=8) :: b
+real(kind=8) :: xp(maxsource),yp(maxsource)
+real(kind=8) :: a(maxsource)
+real(kind=8) :: b,c
 integer :: nvtx,rst
-integer :: it,i
+integer :: i
 
-allocate(xp(1:nvtx))
-allocate(yp(1:nvtx))
-allocate(a(1:nvtx))
 
 do i=1,nvtx
     xp(i)=vtx(i)%x-x
@@ -387,11 +391,11 @@ a(nvtx)=xp(nvtx)*yp(1)-xp(1)*yp(nvtx)
 
 b=a(1)
 do i=2,nvtx
-    b=b*a(i)
-    if(b .le. 0)exit
+    c=b*a(i)
+    if(c .le. 0)exit
 end do
 
-if(b .le. 0)then
+if(c .le. 0)then
     rst=-1
 else
     rst=1
@@ -495,7 +499,6 @@ real(kind=8) :: miny,maxy
 real(kind=8) :: x,y
 real(kind=8) :: length
 real(kind=8) :: a
-integer :: gridtype
 integer :: ipath
 integer :: xnum,ynum
 integer :: i
@@ -709,6 +712,109 @@ dist=radii*theta
 
 end subroutine gcdist
 !--------------------------------------------------------------------------
+
+
+!Update heap when the iheap element changes.s.
+!-------------------------------------------------------------------------
+subroutine updateheap2d(travelt,heap,iheap,heaptail)
+
+implicit none
+type(tstrct) :: travelt(maxgrid)
+integer :: heap(maxnbnode)
+integer :: iheap,heaptail
+
+
+! For iheap which dosen't have parent node.
+if(iheap/2 .eq. 0)then
+    call downheap2d(travelt,heap,iheap,heaptail)
+else if(iheap*2 .gt. heaptail)then
+    call upheap2d(travelt,heap,iheap)
+else
+    if(travelt(heap(iheap/2))%t .gt. travelt(heap(iheap))%t)then
+        call upheap2d(travelt,heap,iheap)
+    else
+        call downheap2d(travelt,heap,iheap,heaptail)
+    end if
+end if
+
+return
+end subroutine updateheap2d
+
+! Upheap
+!--------------------------------------------------------------------------
+subroutine upheap2d(travelt,heap,iheap)
+
+implicit none
+type(tstrct) :: travelt(maxgrid)
+integer :: heap(maxnbnode)
+integer :: temp
+integer :: iheap
+integer :: parent,child
+
+child=iheap
+parent=child/2
+do while(parent .gt. 0)
+    if(travelt(heap(child))%t .lt. travelt(heap(parent))%t)then
+        ! Switch parent and child, include the index in %nbstat
+        travelt(heap(child))%nbstat=parent
+        travelt(heap(parent))%nbstat=child
+        temp=heap(parent)
+        heap(parent)=heap(child)
+        heap(child)=temp
+        child=parent
+        parent=child/2
+    else
+        travelt(heap(child))%nbstat=child
+        parent=0
+    end if
+end do
+
+return
+end subroutine upheap2d
+
+!------------------------------------------------------------------------
+
+
+! downheap
+!--------------------------------------------------------------------------
+subroutine downheap2d(travelt,heap,iheap,heaptail)
+
+implicit none
+type(tstrct) :: travelt(maxgrid)
+integer :: heap(maxnbnode)
+integer :: temp
+integer :: iheap,heaptail
+integer :: parent,child
+
+parent=iheap
+child=parent*2
+do while(child .le. heaptail)
+    
+    if((child + 1) .le. heaptail)then
+        if(travelt(heap(child))%t .gt. travelt(heap(child+1))%t)then
+            child=child+1
+        end if
+    end if
+    
+    if(travelt(heap(parent))%t .gt. travelt(heap(child))%t)then
+        ! Switch parent and child, include the index in %nbstat
+        travelt(heap(child))%nbstat=parent
+        travelt(heap(parent))%nbstat=child
+        temp=heap(parent)
+        heap(parent)=heap(child)
+        heap(child)=temp
+        parent=child
+        child=parent*2
+    else
+        travelt(heap(child))%nbstat=child
+        child=heaptail+1
+    end if
+end do
+
+return
+end subroutine downheap2d
+
+!------------------------------------------------------------------------
 
 
 end module strct
